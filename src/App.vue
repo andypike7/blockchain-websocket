@@ -22,4 +22,7 @@ export default Vue.extend({
   font-family: Arial;
   text-align: center;
 }
+h1 {
+  min-width: 570px !important;
+}
 </style>

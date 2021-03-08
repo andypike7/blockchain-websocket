@@ -2,34 +2,47 @@
   <div class="wrapper">
     <div class="buttons">
       <button
-        @click="clickStart"
         :class="{
           button__start: true,
-          'button--disabled': isConnected,
+          'button--disabled': ws !== null,
         }"
+        @click="clickStart"
       >
-        Start
+        <span v-if="messages.length">Resume</span>
+        <span v-else>Start</span>
       </button>
       <button
-        @click="clickStop"
         :class="{
           button__stop: true,
-          'button--disabled': !isConnected,
+          'button--disabled': ws === null,
         }"
+        @click="clickStop"
       >
         Stop
       </button>
       <button
-        @click="clickClear"
         :class="{
           button__clear: true,
           'button--disabled': !messages.length,
         }"
+        @click="clickClear"
       >
         Clear
       </button>
     </div>
-    <div class="total-sum">Total sum: {{ totalSum }} BTC</div>
+    <div v-if="errorMessages.length" class="error-messages">
+      <div v-for="(errorMessage, index) in errorMessages" :key="index">
+        {{ errorMessage }}
+      </div>
+    </div>
+    <div v-if="messages.length" class="total-sum">
+      Total sum: {{ totalSum }} BTC
+      <div v-if="messages.length != maxTransactions" class="total-of">
+        Transactions:
+        <span>{{ messages.length }}</span> of
+        <span>{{ maxTransactions }}</span> max.
+      </div>
+    </div>
     <table v-if="messages.length">
       <thead>
         <th>From</th>
@@ -44,11 +57,11 @@
             </div>
           </td>
           <td>
-            <div v-for="(hash, index) in message.from" :key="index">
+            <div v-for="(hash, index) in message.to" :key="index">
               {{ hash }}
             </div>
           </td>
-          <td>{{ message.sum }}</td>
+          <td>{{ message.sum / 100000000 }}</td>
         </tr>
       </tbody>
     </table>
@@ -61,30 +74,13 @@
 <script lang="ts">
 import Vue from 'vue';
 import { Component } from 'vue-property-decorator';
-
-const API_URL = 'wss://ws.blockchain.info/inv';
-
-type MessageEvent = {
-  data: string;
-};
-
-type IIncomingInputs = {
-  prev_out: {
-    addr: string;
-    value: number;
-  };
-};
-
-type IIncomingOut = {
-  addr: string;
-  value: number;
-};
-
-type Message = {
-  from: string[];
-  to: string[];
-  sum: number;
-};
+import { API_URL, MAXIMUN_TRANSACTIONS, DEBUG_MODE } from '@/config';
+import {
+  IMessageEvent,
+  IIncomingInputs,
+  IIncomingOut,
+  Message,
+} from '@/interfaces';
 
 @Component({
   name: 'panel',
@@ -92,77 +88,69 @@ type Message = {
 export default class Panel extends Vue {
   ws: WebSocket | null = null;
   messages: Message[] = [];
-  isConnected = false;
+  errorMessages: string[] = [];
+  maxTransactions: number = MAXIMUN_TRANSACTIONS;
 
-  clickStart() {
-    if (this.isConnected) return;
-    console.log('*** START');
+  // Button actions
 
-    this.ws = new WebSocket(API_URL);
-    // TODO: checking
-
-    this.ws.onopen = this.onOpen;
-    this.ws.onclose = this.onClose;
-    this.ws.onmessage = this.onMessage;
-    this.ws.onerror = this.onError;
-
-    this.isConnected = true;
+  clickStop() {
+    if (this.ws !== null) {
+      try {
+        this.ws.send('{ op: "unconfirmed_unsub" }');
+        this.ws.close();
+      } catch (e) {
+        console.log(e);
+      }
+    }
   }
 
-  onOpen(event: Event) {
-    console.log('*** ON OPEN:', event);
+  clickClear() {
+    this.messages = [];
+    this.errorMessages = [];
+  }
+
+  clickStart() {
+    if (this.ws === null) {
+      try {
+        this.ws = new WebSocket(API_URL);
+
+        this.ws.onopen = this.onOpen;
+        this.ws.onclose = this.onClose;
+        this.ws.onmessage = this.onMessage;
+        this.ws.onerror = this.onError;
+      } catch {
+        this.errorMessages.push('Connection error');
+      }
+    }
+  }
+
+  // Websockets events
+
+  onOpen() {
     if (this.ws !== null) {
-      // this.ws.send('{ op: "ping" }');
-      // this.ws.send('{ op: "unconfirmed_sub" }');
-      console.log('*** ON OPEN SEND:', '{ "op": "blocks_sub" }');
       this.ws.send('{ "op": "unconfirmed_sub" }');
     }
   }
 
-  clickStop() {
-    if (this.isConnected && this.ws !== null) {
-      this.ws.send('{ op: "unconfirmed_sub" }');
-      this.isConnected = false;
-    }
-  }
-  clickClear() {
-    console.log('*** CLEAR');
+  onClose() {
+    this.ws = null;
   }
 
-  onClose(event: Event) {
-    console.log('*** ON CLOSE:', event);
-  }
-
-  // "ws://javascript.ru/ws"
-  /*
-    OPEN =>
-      SEND ping =>
-        MESSAGE pong
-  */
-
-  onMessage(event: MessageEvent) {
-    if (this.messages.length < 50) {
+  onMessage(event: IMessageEvent) {
+    if (this.messages.length < MAXIMUN_TRANSACTIONS) {
       try {
         const data = JSON.parse(event.data);
 
-        const from = data.x.inputs.map(
-          (arr: IIncomingInputs) => arr.prev_out.addr,
-        );
-        const to = data.x.out.map((arr: IIncomingOut) => arr.addr);
-
-        const fromSum = data.x.inputs.reduce(
-          (acc: number, arr: IIncomingInputs) => acc + arr.prev_out.value,
-          0,
-        );
-        const toSum = data.x.out.reduce(
-          (acc: number, arr: IIncomingOut) => acc + arr.value,
-          0,
-        );
-        const sum = (fromSum + toSum) / 2 / 10000000;
-
-        this.messages.push({ from, to, sum });
+        this.messages.push({
+          from: data.x.inputs.map((arr: IIncomingInputs) => arr.prev_out.addr),
+          to: data.x.out.map((arr: IIncomingOut) => arr.addr),
+          sum: data.x.out.reduce(
+            (acc: number, arr: IIncomingOut) => acc + arr.value,
+            0,
+          ),
+        });
       } catch {
-        console.log('*** INVALID MESSAGE!!!');
+        this.errorMessages.push('Invalid data received.');
       }
     } else {
       console.log('*** UNSUBSCRIBE!');
@@ -171,102 +159,43 @@ export default class Panel extends Vue {
       }
     }
   }
-  onError(event: Event) {
-    console.log('*** ON ERROR:', event);
+
+  onError() {
+    this.errorMessages.push('Connection could not be established.');
+    return false;
   }
 
+  // Misc
+
   get totalSum() {
-    return this.messages.reduce(
+    const sum = this.messages.reduce(
       (acc: number, message: Message) => acc + message.sum,
       0,
     );
+
+    return (sum / 100000000).toFixed(3);
   }
+
+  // Life cycles
 
   mounted() {
-    console.clear();
-    // this.clickStart();
+    if (DEBUG_MODE) {
+      console.clear();
+    }
   }
 }
-
-/*
-<!DOCTYPE html>
-  <meta charset="utf-8" />
-  <title>WebSocket Test</title>
-  <script language="javascript" type="text/javascript">
-
-  var wsUri = "wss://echo.websocket.org/";
-  var output;
-
-  function init()
-  {
-    output = document.getElementById("output");
-    testWebSocket();
-  }
-
-  function testWebSocket()
-  {
-    websocket = new WebSocket(wsUri);
-    websocket.onopen = function(evt) { onOpen(evt) };
-    websocket.onclose = function(evt) { onClose(evt) };
-    websocket.onmessage = function(evt) { onMessage(evt) };
-    websocket.onerror = function(evt) { onError(evt) };
-  }
-
-  function onOpen(evt)
-  {
-    writeToScreen("CONNECTED");
-    doSend("WebSocket rocks");
-  }
-
-  function onClose(evt)
-  {
-    writeToScreen("DISCONNECTED");
-  }
-
-  function onMessage(evt)
-  {
-    writeToScreen('<span style="color: blue;">RESPONSE: ' + evt.data+'</span>');
-    websocket.close();
-  }
-
-  function onError(evt)
-  {
-    writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
-  }
-
-  function doSend(message)
-  {
-    writeToScreen("SENT: " + message);
-    websocket.send(message);
-  }
-
-  function writeToScreen(message)
-  {
-    var pre = document.createElement("p");
-    pre.style.wordWrap = "break-word";
-    pre.innerHTML = message;
-    output.appendChild(pre);
-  }
-
-  window.addEventListener("load", init, false);
-
-  < /script >
-
-  <h2>WebSocket Test</h2>
-
-  <div id="output"></div>
-*/
 </script>
 
 <style lang="scss" scoped>
 .wrapper {
-  width: 1000px;
+  min-width: 570px;
   padding: 5px;
   margin: auto;
 }
 .buttons {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  grid-column-gap: 30px;
 }
 .buttons button {
   font-size: 15px;
@@ -298,15 +227,29 @@ export default class Panel extends Vue {
     opacity: 1 !important;
   }
 }
+.error-messages {
+  color: red;
+  text-align: center;
+  padding: 30px 0 0;
+  margin-bottom: -15px;
+}
 .no-transactions {
   color: silver;
   text-align: center;
-  padding: 10px;
+  padding: 30px;
+  font-size: 32px;
 }
 .total-sum {
   padding-top: 20px;
   font-weight: bold;
   font-size: 20px;
+  .total-of {
+    font-size: 10px;
+    color: silver;
+    span {
+      color: gray;
+    }
+  }
 }
 table {
   margin-top: 20px;
