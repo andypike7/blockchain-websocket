@@ -24,11 +24,12 @@
     "eslint-plugin-prettier": "^3.1.3",
     "eslint-plugin-vue": "^6.2.2",
     "prettier": "^1.19.1",
+    "prettier-eslint": "^12.0.0",
     "sass": "^1.26.5",
     "sass-loader": "^8.0.2",
     "typescript": "~3.9.3",
     "vue-class-component": "^7.2.6",
-    "vue-property-decorator": "^10.0.0-rc.2",
+    "vue-property-decorator": "^9.1.2",
     "vue-template-compiler": "^2.6.11"
   },
   "eslintConfig": {
@@ -52,5 +53,12 @@
     "> 1%",
     "last 2 versions",
     "not dead"
-  ]
+  ],
+  "prettier": {
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "semi": true,
+    "singleQuote": true,
+    "arrowParens": "always"
+  }
 }
