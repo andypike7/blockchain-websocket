@@ -68,6 +68,18 @@ type MessageEvent = {
   data: string;
 };
 
+type IIncomingInputs = {
+  prev_out: {
+    addr: string;
+    value: number;
+  };
+};
+
+type IIncomingOut = {
+  addr: string;
+  value: number;
+};
+
 type Message = {
   from: string[];
   to: string[];
@@ -81,7 +93,6 @@ export default class Panel extends Vue {
   ws: WebSocket | null = null;
   messages: Message[] = [];
   isConnected = false;
-  totalSum = 0;
 
   clickStart() {
     if (this.isConnected) return;
@@ -109,11 +120,10 @@ export default class Panel extends Vue {
   }
 
   clickStop() {
-    if (!this.isConnected) return;
-    console.log('*** START');
-
-    this.isConnected = false;
-    console.log('*** STOP');
+    if (this.isConnected && this.ws !== null) {
+      this.ws.send('{ op: "unconfirmed_sub" }');
+      this.isConnected = false;
+    }
   }
   clickClear() {
     console.log('*** CLEAR');
@@ -131,34 +141,45 @@ export default class Panel extends Vue {
   */
 
   onMessage(event: MessageEvent) {
-    if (this.messages.length < 5) {
+    if (this.messages.length < 50) {
       try {
         const data = JSON.parse(event.data);
-        console.log('*** DATA:', data);
 
-        const from = data.x.inputs.map((arr) => arr.prev_out.addr);
-        const to = data.x.out.map((arr) => arr.addr);
-        const sum = 0.012345;
+        const from = data.x.inputs.map(
+          (arr: IIncomingInputs) => arr.prev_out.addr,
+        );
+        const to = data.x.out.map((arr: IIncomingOut) => arr.addr);
 
-        const message: Message = { from, to, sum };
+        const fromSum = data.x.inputs.reduce(
+          (acc: number, arr: IIncomingInputs) => acc + arr.prev_out.value,
+          0,
+        );
+        const toSum = data.x.out.reduce(
+          (acc: number, arr: IIncomingOut) => acc + arr.value,
+          0,
+        );
+        const sum = (fromSum + toSum) / 2 / 10000000;
 
-        // 1A828tTnkVFJfSvLCqF42ohZ51ksS3jJgX
-        // 1BwGf3z7n2fHk6NoVJNkV32qwyAYsMhkWf
-
-        this.messages.push(message);
-        console.log('*** MESSAGE:', message);
+        this.messages.push({ from, to, sum });
       } catch {
         console.log('*** INVALID MESSAGE!!!');
       }
     } else {
-      console.log('*** UNSUBSCCRIBE!');
+      console.log('*** UNSUBSCRIBE!');
       if (this.ws !== null) {
-        this.ws.send('{ op: "unconfirmed_sub" }');
+        this.clickStop();
       }
     }
   }
   onError(event: Event) {
     console.log('*** ON ERROR:', event);
+  }
+
+  get totalSum() {
+    return this.messages.reduce(
+      (acc: number, message: Message) => acc + message.sum,
+      0,
+    );
   }
 
   mounted() {
@@ -239,7 +260,7 @@ export default class Panel extends Vue {
 
 <style lang="scss" scoped>
 .wrapper {
-  width: 650px;
+  width: 1000px;
   padding: 5px;
   margin: auto;
 }
