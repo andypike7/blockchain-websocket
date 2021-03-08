@@ -1,0 +1,18 @@
+c:
+cd \Projects
+vue create blockchain-websocket
+
+http://localhost:8080/
+
+git init
+git add .
+git commit -m "Initial"
+git branch -M master
+git remote add origin https://github.com/andypike7/blockchain-websocket.git
+git push -u origin master
+
+npm run serve
+http://localhost:8080/
+
+npm install --save-dev vue-class-component
+npm install --save-dev vue-property-decorator
