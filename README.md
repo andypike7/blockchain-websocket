@@ -1,6 +1,14 @@
 # blockchain-websocket
 
 ## Project setup
+
+Based on blockchain API:
+https://www.blockchain.com/ru/api/api_websocket
+
+Receiving new transactions in realtime using native WebSocket class.
+No exernal dependencies.
+
+## Project setup
 ```
 npm install
 ```
@@ -9,16 +17,3 @@ npm install
 ```
 npm run serve
 ```
-
-### Compiles and minifies for production
-```
-npm run build
-```
-
-### Lints and fixes files
-```
-npm run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).

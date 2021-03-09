@@ -4,7 +4,8 @@
       <button
         :class="{
           button__start: true,
-          'button--disabled': ws !== null,
+          'button--disabled':
+            ws !== null || messages.length === maxTransactions,
         }"
         @click="clickStart"
       >
@@ -38,12 +39,12 @@
     <div v-if="messages.length" class="total-sum">
       Total sum: {{ totalSum }} BTC
       <div v-if="messages.length != maxTransactions" class="total-of">
-        Transactions:
-        <span>{{ messages.length }}</span> of
-        <span>{{ maxTransactions }}</span> max.
+        Transactions: <span>{{ messages.length }}</span> (of
+        <span>{{ maxTransactions }}</span
+        >).
       </div>
     </div>
-    <table v-if="messages.length">
+    <table v-if="messages.length" class="table">
       <thead>
         <th>From</th>
         <th>To</th>
@@ -52,12 +53,12 @@
       <tbody>
         <tr v-for="(message, index) in messages" :key="index">
           <td>
-            <div v-for="(hash, index) in message.from" :key="index">
+            <div v-for="(hash, key) in message.from" :key="key">
               {{ hash }}
             </div>
           </td>
           <td>
-            <div v-for="(hash, index) in message.to" :key="index">
+            <div v-for="(hash, key) in message.to" :key="key">
               {{ hash }}
             </div>
           </td>
@@ -74,13 +75,17 @@
 <script lang="ts">
 import Vue from 'vue';
 import { Component } from 'vue-property-decorator';
-import { API_URL, MAXIMUN_TRANSACTIONS, DEBUG_MODE } from '@/config';
 import {
   IMessageEvent,
   IIncomingInputs,
   IIncomingOut,
   Message,
 } from '@/interfaces';
+import {
+  API_URL,
+  MAXIMUN_TRANSACTIONS,
+  TOTAL_SUM_FRACTION_DIGITS,
+} from '@/config';
 
 @Component({
   name: 'panel',
@@ -93,35 +98,29 @@ export default class Panel extends Vue {
 
   // Button actions
 
+  clickStart() {
+    if (this.ws === null) {
+      try {
+        this.ws = new WebSocket(API_URL);
+        this.ws.onopen = this.onOpen;
+        this.ws.onclose = this.onClose;
+        this.ws.onmessage = this.onMessage;
+        this.ws.onerror = this.onError;
+        this.errorMessages = [];
+      } catch {
+        this.errorMessages.push('Connection error');
+      }
+    }
+  }
+
   clickStop() {
     if (this.ws !== null) {
-      try {
-        this.ws.send('{ op: "unconfirmed_unsub" }');
-        this.ws.close();
-      } catch (e) {
-        console.log(e);
-      }
+      this.ws.close();
     }
   }
 
   clickClear() {
     this.messages = [];
-    this.errorMessages = [];
-  }
-
-  clickStart() {
-    if (this.ws === null) {
-      try {
-        this.ws = new WebSocket(API_URL);
-
-        this.ws.onopen = this.onOpen;
-        this.ws.onclose = this.onClose;
-        this.ws.onmessage = this.onMessage;
-        this.ws.onerror = this.onError;
-      } catch {
-        this.errorMessages.push('Connection error');
-      }
-    }
   }
 
   // Websockets events
@@ -151,18 +150,16 @@ export default class Panel extends Vue {
         });
       } catch {
         this.errorMessages.push('Invalid data received.');
-      }
-    } else {
-      console.log('*** UNSUBSCRIBE!');
-      if (this.ws !== null) {
         this.clickStop();
       }
+    } else {
+      this.clickStop();
     }
   }
 
   onError() {
-    this.errorMessages.push('Connection could not be established.');
-    return false;
+    this.errorMessages.push(`Connection cannot be established.`);
+    this.clickStop();
   }
 
   // Misc
@@ -173,15 +170,7 @@ export default class Panel extends Vue {
       0,
     );
 
-    return (sum / 100000000).toFixed(3);
-  }
-
-  // Life cycles
-
-  mounted() {
-    if (DEBUG_MODE) {
-      console.clear();
-    }
+    return (sum / 100000000).toFixed(TOTAL_SUM_FRACTION_DIGITS);
   }
 }
 </script>
@@ -230,7 +219,7 @@ export default class Panel extends Vue {
 .error-messages {
   color: red;
   text-align: center;
-  padding: 30px 0 0;
+  padding: 30px 0 20px;
   margin-bottom: -15px;
 }
 .no-transactions {
@@ -251,7 +240,7 @@ export default class Panel extends Vue {
     }
   }
 }
-table {
+.table {
   margin-top: 20px;
   border-collapse: collapse;
   width: 100%;

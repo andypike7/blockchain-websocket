@@ -20,14 +20,13 @@ npm install --save-dev vue-property-decorator@9.1.2
 tsconfig.json:
   "experimentalDecorators": true,
 
+npm install --save-dev prettier-eslint
+
 package.json:
   "prettier": {
     "trailingComma": "all",
     "tabWidth": 2,
     "semi": true,
-    "singleQuote": true
+    "singleQuote": true,
+    "arrowParens": "always"
   }
-
-npm install --save-dev prettier-eslint
-
-https://blockchain.info/ru/api/api_websocket

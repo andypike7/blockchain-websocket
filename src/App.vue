@@ -7,7 +7,7 @@
 
 <script lang="ts">
 import Vue from 'vue';
-import Panel from './components/Panel';
+import Panel from '@/components/Main';
 
 export default Vue.extend({
   name: 'App',
