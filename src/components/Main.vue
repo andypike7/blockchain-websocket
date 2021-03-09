@@ -87,10 +87,8 @@ import {
   TOTAL_SUM_FRACTION_DIGITS,
 } from '@/config';
 
-@Component({
-  name: 'panel',
-})
-export default class Panel extends Vue {
+@Component
+export default class Main extends Vue {
   ws: WebSocket | null = null;
   messages: Message[] = [];
   errorMessages: string[] = [];

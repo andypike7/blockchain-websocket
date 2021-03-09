@@ -1,18 +1,18 @@
 <template>
   <div id="app">
     <h1>Blockchain Websocket</h1>
-    <Panel />
+    <Main />
   </div>
 </template>
 
 <script lang="ts">
 import Vue from 'vue';
-import Panel from '@/components/Main';
+import Main from '@/components/Main.vue';
 
 export default Vue.extend({
   name: 'App',
   components: {
-    Panel,
+    Main,
   },
 });
 </script>
