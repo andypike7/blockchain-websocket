@@ -1,6 +1,14 @@
 <template>
   <div id="app">
-    <h1>Blockchain Websocket demo</h1>
+    <h1>
+      Blockchain Websocket demo
+      <a
+        class="github"
+        href="https://github.com/andypike7/blockchain-websocket"
+      >
+        View source on Github.
+      </a>
+    </h1>
     <Main />
   </div>
 </template>
@@ -24,5 +32,11 @@ export default Vue.extend({
 }
 h1 {
   min-width: 570px !important;
+}
+.github {
+  font-size: 12px;
+  color: blue;
+  display: block;
+  font-weight: normal;
 }
 </style>
