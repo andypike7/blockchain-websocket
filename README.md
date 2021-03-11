@@ -9,7 +9,7 @@ Receiving new transactions in realtime using native WebSocket class.
 No exernal dependencies.
 
 Live demo:
-http://sym.ru/demo/blockchain-websocket
+http://blockchain-websocket.sym.ru/
 
 ## Project setup
 ```

@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <h1>Blockchain Websocket</h1>
+    <h1>Blockchain Websocket demo</h1>
     <Main />
   </div>
 </template>
