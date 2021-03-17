@@ -13,7 +13,8 @@
     "baseUrl": ".",
     "experimentalDecorators": true,
     "types": [
-      "webpack-env"
+      "webpack-env",
+      "node"
     ],
     "paths": {
       "@/*": [
@@ -23,7 +24,7 @@
     "lib": [
       "esnext",
       "dom",
-      "dom.iterable",
+      "dom.iter",
       "scripthost"
     ]
   },

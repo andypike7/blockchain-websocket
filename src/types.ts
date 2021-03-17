@@ -1,15 +1,15 @@
-export type IMessageEvent = {
+export type MessageEvent = {
   data: string;
 };
 
-export type IIncomingInputs = {
+export type IncomingInputs = {
   prev_out: {
     addr: string;
     value: number;
   };
 };
 
-export type IIncomingOut = {
+export type IncomingOut = {
   addr: string;
   value: number;
 };

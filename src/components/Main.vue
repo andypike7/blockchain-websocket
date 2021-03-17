@@ -1,31 +1,27 @@
-`<template>
+<template>
   <div class="wrapper">
     <div class="buttons">
       <button
-        :class="{
-          button__start: true,
-          'button--disabled':
-            ws !== null || messages.length === maxTransactions,
-        }"
+        :class="[
+          'button__start',
+          {
+            'button--disabled':
+              isSubscribed || messages.length === maxTransactions,
+          },
+        ]"
         @click="clickStart"
       >
         <span v-if="messages.length">Resume</span>
         <span v-else>Start</span>
       </button>
       <button
-        :class="{
-          button__stop: true,
-          'button--disabled': ws === null,
-        }"
+        :class="['button__stop', { 'button--disabled': !isSubscribed }]"
         @click="clickStop"
       >
         Stop
       </button>
       <button
-        :class="{
-          button__clear: true,
-          'button--disabled': !messages.length,
-        }"
+        :class="['button__clear', { 'button--disabled': !messages.length }]"
         @click="clickClear"
       >
         Clear
@@ -37,7 +33,7 @@
       </div>
     </div>
     <div v-if="messages.length" class="total-sum">
-      Total sum: {{ totalSum }} BTC
+      Total sum: {{ totalSum | toBtc }} BTC
       <div v-if="messages.length != maxTransactions" class="total-of">
         Transactions: <span>{{ messages.length }}</span> (of
         <span>{{ maxTransactions }}</span
@@ -62,7 +58,7 @@
               {{ hash }}
             </div>
           </td>
-          <td>{{ message.sum / 100000000 }}</td>
+          <td>{{ message.sum | toBtc }}</td>
         </tr>
       </tbody>
     </table>
@@ -75,76 +71,67 @@
 <script lang="ts">
 import Vue from 'vue';
 import { Component } from 'vue-property-decorator';
-import {
-  IMessageEvent,
-  IIncomingInputs,
-  IIncomingOut,
-  Message,
-} from '@/interfaces';
+import { MessageEvent, IncomingInputs, IncomingOut, Message } from '@/types';
 import {
   API_URL,
   MAXIMUN_TRANSACTIONS,
+  BTC_TO_SATOSHI,
   TOTAL_SUM_FRACTION_DIGITS,
 } from '@/config';
 
-@Component
+@Component({
+  filters: {
+    toBtc(value: string) {
+      return (+value / BTC_TO_SATOSHI).toFixed(TOTAL_SUM_FRACTION_DIGITS);
+    },
+  },
+})
 export default class Main extends Vue {
   ws: WebSocket | null = null;
   messages: Message[] = [];
   errorMessages: string[] = [];
   maxTransactions: number = MAXIMUN_TRANSACTIONS;
+  isSubscribed = false;
+  totalSum = 0;
 
-  // Button actions
+  // Buttons actions
 
   clickStart() {
-    if (this.ws === null) {
-      try {
-        this.ws = new WebSocket(API_URL);
-        this.ws.onopen = this.onOpen;
-        this.ws.onclose = this.onClose;
-        this.ws.onmessage = this.onMessage;
-        this.ws.onerror = this.onError;
-        this.errorMessages = [];
-      } catch {
-        this.errorMessages.push('Connection error');
-      }
+    if (this.ws !== null && !this.isSubscribed) {
+      this.ws.send('{ "op": "unconfirmed_sub" }');
+      this.isSubscribed = true;
     }
   }
 
   clickStop() {
-    if (this.ws !== null) {
-      this.ws.close();
+    if (this.ws !== null && this.isSubscribed) {
+      this.ws.send('{ "op": "unconfirmed_unsub" }');
+      this.isSubscribed = false;
     }
   }
 
   clickClear() {
     this.messages = [];
+    this.totalSum = 0;
   }
 
   // Websockets events
 
-  onOpen() {
-    if (this.ws !== null) {
-      this.ws.send('{ "op": "unconfirmed_sub" }');
-    }
-  }
-
-  onClose() {
-    this.ws = null;
-  }
-
-  onMessage(event: IMessageEvent) {
+  onMessage(event: MessageEvent) {
     if (this.messages.length < MAXIMUN_TRANSACTIONS) {
       try {
         const data = JSON.parse(event.data);
 
+        const sum: number = data.x.out.reduce(
+          (acc: number, arr: IncomingOut) => acc + arr.value,
+          0,
+        );
+        this.totalSum += sum;
+
         this.messages.push({
-          from: data.x.inputs.map((arr: IIncomingInputs) => arr.prev_out.addr),
-          to: data.x.out.map((arr: IIncomingOut) => arr.addr),
-          sum: data.x.out.reduce(
-            (acc: number, arr: IIncomingOut) => acc + arr.value,
-            0,
-          ),
+          from: data.x.inputs.map((arr: IncomingInputs) => arr.prev_out.addr),
+          to: data.x.out.map((arr: IncomingOut) => arr.addr),
+          sum,
         });
       } catch {
         this.errorMessages.push('Invalid data received.');
@@ -160,15 +147,31 @@ export default class Main extends Vue {
     this.clickStop();
   }
 
-  // Misc
+  // Lifecycles
 
-  get totalSum() {
-    const sum = this.messages.reduce(
-      (acc: number, message: Message) => acc + message.sum,
-      0,
-    );
+  websocketConnect() {
+    if (this.ws === null) {
+      try {
+        this.ws = new WebSocket(API_URL);
+        this.ws.onmessage = this.onMessage;
+        this.ws.onerror = this.onError;
+        this.errorMessages = [];
+      } catch {
+        this.errorMessages.push('Connection error, retry in 5 sec...');
+        setTimeout(this.websocketConnect, 5000);
+      }
+    }
+  }
 
-    return (sum / 100000000).toFixed(TOTAL_SUM_FRACTION_DIGITS);
+  mounted() {
+    this.websocketConnect();
+  }
+
+  beforeDestroy() {
+    if (this.ws !== null) {
+      this.clickStop();
+      this.ws.close();
+    }
   }
 }
 </script>
@@ -223,7 +226,7 @@ export default class Main extends Vue {
 .no-transactions {
   color: silver;
   text-align: center;
-  padding: 30px;
+  padding: 30px 30px 0;
   font-size: 32px;
 }
 .total-sum {
