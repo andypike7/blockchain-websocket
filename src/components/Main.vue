@@ -2,26 +2,26 @@
   <div class="wrapper">
     <div class="buttons">
       <button
-        :class="[
-          'button__start',
-          {
-            'button--disabled':
-              isSubscribed || messages.length === maxTransactions,
-          },
-        ]"
+        class="button__start"
+        :class="{
+          'button--disabled':
+            isSubscribed || messages.length === maxTransactions,
+        }"
         @click="clickStart"
       >
         <span v-if="messages.length">Resume</span>
         <span v-else>Start</span>
       </button>
       <button
-        :class="['button__stop', { 'button--disabled': !isSubscribed }]"
+        class="button__stop"
+        :class="{ 'button--disabled': !isSubscribed }"
         @click="clickStop"
       >
         Stop
       </button>
       <button
-        :class="['button__clear', { 'button--disabled': !messages.length }]"
+        class="button__clear"
+        :class="{ 'button--disabled': !messages.length }"
         @click="clickClear"
       >
         Clear
